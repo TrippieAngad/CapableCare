@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-# CapableCare
-Hackathon project by Sean, Angad, Kerem
-=======
 # CapableCare Portal
 
 Supabase-managed care coordination app built from the `capablecare_vision_doc`.
@@ -52,6 +48,15 @@ npm install
 npm run dev
 ```
 
+## Environment
+
+Create `frontend/.env.local` with:
+
+```bash
+VITE_SUPABASE_URL=your-project-url
+VITE_SUPABASE_ANON_KEY=your-publishable-key
+```
+
 ## Important files
 
 - App UI: [`frontend/src/App.tsx`](./frontend/src/App.tsx)
@@ -63,4 +68,3 @@ npm run dev
 - Row-level security is part of the product model, not an optional add-on.
 - If you change care access rules, update both SQL policies and the frontend query assumptions together.
 - The old FastAPI prototype has been removed so the repo matches the deployed architecture.
->>>>>>> 6245efa (Initial commit: frontend, supabase schema, and project structure)
