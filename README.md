@@ -50,12 +50,20 @@ npm run dev
 
 ## Environment
 
-Create `frontend/.env.local` with:
+The repo includes a checked-in `frontend/.env` with the Supabase project URL and publishable client key so new clones can run immediately.
+
+If you need to override that locally, create `frontend/.env.local` with:
 
 ```bash
 VITE_SUPABASE_URL=your-project-url
 VITE_SUPABASE_ANON_KEY=your-publishable-key
 ```
+
+Do not add privileged credentials to the frontend:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+- database passwords
+- direct Postgres connection strings
 
 ## Important files
 

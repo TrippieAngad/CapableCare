@@ -6,11 +6,11 @@ dist/
 *.tsbuildinfo
 
 # Environment files and local overrides
-.env
 .env.*
 *.env
 *.local
 !.env.example
+!frontend/.env
 
 # Common secret and key files
 *.key
