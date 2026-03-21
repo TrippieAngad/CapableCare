@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment files and local overrides
+.env
+.env.*
+*.env
+*.local
+!.env.example
+
+# Common secret and key files
+*.key
+*.pem
+*.p12
+*.p8
+secrets.*
+
+# OS/editor noise
+.DS_Store
