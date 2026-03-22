@@ -102,6 +102,10 @@ export function ECareAIChat() {
   }, [mode]);
 
   React.useEffect(() => {
+    if (mode !== "speech" || loadingVoiceAgents || voiceAgentsLoaded) {
+      return;
+    }
+
     let cancelled = false;
 
     async function loadVoiceAgents() {
@@ -119,6 +123,7 @@ export function ECareAIChat() {
           return;
         }
 
+        setVoiceError(null);
         setVoiceAgents(agents);
         setVoiceAgentsLoaded(true);
         setSelectedVoiceAgentId((current) => {
@@ -148,7 +153,7 @@ export function ECareAIChat() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadingVoiceAgents, mode, voiceAgentsLoaded]);
 
   async function submitPrompt(event: React.FormEvent) {
     event.preventDefault();

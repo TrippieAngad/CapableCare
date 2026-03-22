@@ -189,6 +189,29 @@ const server = createServer(async (request, response) => {
   writeJson(response, 404, { error: "Not found" });
 });
 
+server.on("error", (error) => {
+  if (!(error instanceof Error)) {
+    console.error("CapableCare server failed to start:", error);
+    process.exit(1);
+  }
+
+  const details =
+    "code" in error && typeof error.code === "string"
+      ? ` (${error.code})`
+      : "";
+
+  if ("port" in error && "address" in error) {
+    console.error(
+      `CapableCare server failed to bind to http://${HOST}:${PORT}${details}. ` +
+        "Set HOST and PORT in server/.env.local to an available address.",
+    );
+    process.exit(1);
+  }
+
+  console.error(`CapableCare server failed to start${details}: ${error.message}`);
+  process.exit(1);
+});
+
 server.listen(PORT, HOST, () => {
   console.log(`CapableCare server listening on http://${HOST}:${PORT}`);
 });

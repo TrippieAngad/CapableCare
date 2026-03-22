@@ -172,6 +172,8 @@ export interface Task {
   due_date: string;
 }
 
+const BLOCKED_TASK_PHRASES = ["bring granny to strip club"];
+
 export interface Ticket {
   id: string;
   category: string;
@@ -701,7 +703,12 @@ async function fetchTasks(clientId: string): Promise<Task[]> {
     .eq("elderly_client_id", clientId)
     .order("due_date", { ascending: true });
   if (error) throw error;
-  return (data ?? []) as Task[];
+  return ((data ?? []) as Task[]).filter((task) => !containsBlockedTaskPhrase(task));
+}
+
+function containsBlockedTaskPhrase(task: Pick<Task, "title" | "description">) {
+  const content = `${task.title} ${task.description}`.toLowerCase();
+  return BLOCKED_TASK_PHRASES.some((phrase) => content.includes(phrase));
 }
 
 async function fetchSupportTickets(customerId: string): Promise<Ticket[]> {
