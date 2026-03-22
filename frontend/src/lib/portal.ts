@@ -1,5 +1,5 @@
 import { Session } from "@supabase/supabase-js";
-import { supabase } from "./supabase";
+import { requireSupabase } from "./supabase";
 
 export type Role = "customer" | "caretaker";
 export type ConfidenceStatus = "Stable" | "Watch" | "Action Needed";
@@ -236,12 +236,14 @@ export const initialData: DashboardData = {
 };
 
 export async function getSession(): Promise<Session | null> {
+  const supabase = requireSupabase();
   const { data, error } = await supabase.auth.getSession();
   if (error) throw error;
   return data.session;
 }
 
 export async function signIn(email: string, password: string) {
+  const supabase = requireSupabase();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw error;
 }
@@ -253,6 +255,7 @@ export async function signUp(input: {
   name: string;
   phone: string;
 }) {
+  const supabase = requireSupabase();
   const { error } = await supabase.auth.signUp({
     email: input.email,
     password: input.password,
@@ -268,11 +271,13 @@ export async function signUp(input: {
 }
 
 export async function signOut() {
+  const supabase = requireSupabase();
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
 }
 
 export async function loadDashboard(): Promise<DashboardData> {
+  requireSupabase();
   const authUser = await requireUser();
   const profile = await fetchProfile(authUser.id);
   const plans = await fetchPlans();
@@ -365,6 +370,7 @@ export async function submitMessage(
   threadId: string,
   payload: { content: string; attachment_url: string | null },
 ) {
+  const supabase = requireSupabase();
   const authUser = await requireUser();
   const { error } = await supabase.from("messages").insert({
     thread_id: threadId,
@@ -386,6 +392,7 @@ export async function submitTask(
     assigned_to: string | null;
   },
 ) {
+  const supabase = requireSupabase();
   const authUser = await requireUser();
   const { error } = await supabase.from("tasks").insert({
     elderly_client_id: clientId,
@@ -401,6 +408,7 @@ export async function submitTask(
 }
 
 export async function updateTask(taskId: string, status: Task["status"]) {
+  const supabase = requireSupabase();
   const { error } = await supabase.from("tasks").update({ status }).eq("id", taskId);
   if (error) throw error;
 }
@@ -410,6 +418,7 @@ export async function submitSupportTicket(payload: {
   description: string;
   attachment_url: string | null;
 }) {
+  const supabase = requireSupabase();
   const authUser = await requireUser();
   const { error } = await supabase.from("support_tickets").insert({
     customer_id: authUser.id,
@@ -421,6 +430,7 @@ export async function submitSupportTicket(payload: {
 }
 
 export async function switchPlan(planId: string) {
+  const supabase = requireSupabase();
   const authUser = await requireUser();
   const profile = await fetchProfile(authUser.id);
   if (profile.role !== "customer") {
@@ -473,6 +483,7 @@ export async function submitVisitLog(
     incident_actions: string | null;
   },
 ) {
+  const supabase = requireSupabase();
   const authUser = await requireUser();
   const { data: insertedLog, error: logError } = await supabase
     .from("visit_logs")
@@ -526,6 +537,7 @@ async function requireUser() {
 }
 
 async function fetchProfile(userId: string) {
+  const supabase = requireSupabase();
   const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single();
   if (error) throw error;
   return data as {
@@ -537,6 +549,7 @@ async function fetchProfile(userId: string) {
 }
 
 async function fetchPlans(): Promise<SubscriptionPlan[]> {
+  const supabase = requireSupabase();
   const { data, error } = await supabase.from("subscription_plans").select("*").order("price_monthly");
   if (error) throw error;
   return (data ?? []).map((plan) => ({
@@ -550,6 +563,7 @@ async function fetchPlans(): Promise<SubscriptionPlan[]> {
 }
 
 async function fetchClientForProfile(profile: { id: string; role: Role }): Promise<RawClient | null> {
+  const supabase = requireSupabase();
   if (profile.role === "customer") {
     const { data, error } = await supabase
       .from("family_links")
@@ -576,6 +590,7 @@ async function fetchSubscriptionPlanId(
   profile: { id: string; role: Role },
   client: { subscription_tier_id?: string | null } | null,
 ) {
+  const supabase = requireSupabase();
   if (profile.role !== "customer") {
     return client?.subscription_tier_id ?? null;
   }
@@ -589,6 +604,7 @@ async function fetchSubscriptionPlanId(
 }
 
 async function fetchUpcomingVisits(clientId: string): Promise<ScheduledVisit[]> {
+  const supabase = requireSupabase();
   const { data, error } = await supabase
     .from("scheduled_visits")
     .select("*")
@@ -604,6 +620,7 @@ async function ensureThread(
   clientId: string,
   assignedCaretakerId: string | null,
 ): Promise<Thread | null> {
+  const supabase = requireSupabase();
   const threadQuery = profile.role === "customer"
     ? supabase.from("threads").select("*").eq("customer_id", profile.id).eq("elderly_client_id", clientId)
     : supabase.from("threads").select("*").eq("caretaker_id", profile.id).eq("elderly_client_id", clientId);
@@ -645,6 +662,7 @@ async function ensureThread(
 }
 
 async function fetchMessages(threadId: string): Promise<Message[]> {
+  const supabase = requireSupabase();
   const { data, error } = await supabase
     .from("messages")
     .select("*")
@@ -655,6 +673,7 @@ async function fetchMessages(threadId: string): Promise<Message[]> {
 }
 
 async function fetchVisitLogs(clientId: string) {
+  const supabase = requireSupabase();
   const { data, error } = await supabase
     .from("visit_logs")
     .select("*")
@@ -665,6 +684,7 @@ async function fetchVisitLogs(clientId: string) {
 }
 
 async function fetchVisitAssessments(clientId: string) {
+  const supabase = requireSupabase();
   const { data, error } = await supabase
     .from("visit_assessments")
     .select("*, visit_logs!inner(elderly_client_id)")
@@ -674,6 +694,7 @@ async function fetchVisitAssessments(clientId: string) {
 }
 
 async function fetchTasks(clientId: string): Promise<Task[]> {
+  const supabase = requireSupabase();
   const { data, error } = await supabase
     .from("tasks")
     .select("*")
@@ -684,6 +705,7 @@ async function fetchTasks(clientId: string): Promise<Task[]> {
 }
 
 async function fetchSupportTickets(customerId: string): Promise<Ticket[]> {
+  const supabase = requireSupabase();
   const { data, error } = await supabase
     .from("support_tickets")
     .select("*")
@@ -694,12 +716,14 @@ async function fetchSupportTickets(customerId: string): Promise<Ticket[]> {
 }
 
 async function fetchCarePlan(clientId: string): Promise<CarePlan | null> {
+  const supabase = requireSupabase();
   const { data, error } = await supabase.from("care_plans").select("*").eq("elderly_client_id", clientId).maybeSingle();
   if (error) throw error;
   return (data as CarePlan | null) ?? null;
 }
 
 async function fetchIncidents(clientId: string): Promise<Incident[]> {
+  const supabase = requireSupabase();
   const { data, error } = await supabase
     .from("incident_reports")
     .select("*")
@@ -710,6 +734,7 @@ async function fetchIncidents(clientId: string): Promise<Incident[]> {
 }
 
 async function fetchAlerts(clientId: string): Promise<Alert[]> {
+  const supabase = requireSupabase();
   const { data, error } = await supabase
     .from("alerts")
     .select("*")
@@ -720,6 +745,7 @@ async function fetchAlerts(clientId: string): Promise<Alert[]> {
 }
 
 async function fetchWeeklyBrief(clientId: string): Promise<WeeklyBrief | null> {
+  const supabase = requireSupabase();
   const { data, error } = await supabase
     .from("weekly_briefs")
     .select("*")
@@ -732,6 +758,7 @@ async function fetchWeeklyBrief(clientId: string): Promise<WeeklyBrief | null> {
 }
 
 async function fetchFamilyMembers(clientId: string): Promise<FamilyMember[]> {
+  const supabase = requireSupabase();
   const { data, error } = await supabase
     .from("family_members")
     .select("*")
@@ -742,6 +769,7 @@ async function fetchFamilyMembers(clientId: string): Promise<FamilyMember[]> {
 }
 
 async function fetchAppointments(clientId: string): Promise<Appointment[]> {
+  const supabase = requireSupabase();
   const { data, error } = await supabase
     .from("appointments")
     .select("*")
@@ -752,6 +780,7 @@ async function fetchAppointments(clientId: string): Promise<Appointment[]> {
 }
 
 async function fetchTransportRequests(clientId: string): Promise<TransportRequest[]> {
+  const supabase = requireSupabase();
   const { data, error } = await supabase
     .from("transport_requests")
     .select("*")
@@ -762,6 +791,7 @@ async function fetchTransportRequests(clientId: string): Promise<TransportReques
 }
 
 async function fetchCaretakerProfile(caretakerId: string): Promise<CaretakerProfile | null> {
+  const supabase = requireSupabase();
   const { data, error } = await supabase
     .from("profiles")
     .select("id, name, verified")
@@ -772,6 +802,7 @@ async function fetchCaretakerProfile(caretakerId: string): Promise<CaretakerProf
 }
 
 async function fetchCaretakerMetrics(caretakerId: string): Promise<CaretakerMetrics | null> {
+  const supabase = requireSupabase();
   const { data, error } = await supabase
     .from("caretaker_metrics")
     .select("*")

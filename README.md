@@ -4,14 +4,13 @@ Supabase-managed care coordination app built from the `capablecare_vision_doc`.
 
 ## Architecture
 
-This repo is now Supabase-only:
+This repo is primarily Supabase-managed with one minimal local helper service for signed ElevenLabs voice sessions:
 
 - `frontend/`: React + TypeScript + Vite + `@supabase/supabase-js`
+- `server/`: lightweight Node server for signed ElevenLabs conversation tokens
 - `supabase/schema.sql`: base schema, auth trigger, RLS, plans, storage buckets
 - `supabase/mvp-extension.sql`: trust, confidence, coordination, and proactive-risk additions
 - `supabase/seed-demo.sql`: demo users' linked care data
-
-There is no active custom backend service in this project anymore. Auth, database access, storage, and access control are handled by Supabase.
 
 ## Product scope in this repo
 
@@ -43,9 +42,8 @@ Schema/migrations already created for the app:
 ## Run locally
 
 ```bash
-cd frontend
-npm install
-npm run dev
+npm run dev:server
+npm run dev:frontend
 ```
 
 ## Environment
@@ -57,6 +55,25 @@ If you need to override that locally, create `frontend/.env.local` with:
 ```bash
 VITE_SUPABASE_URL=your-project-url
 VITE_SUPABASE_ANON_KEY=your-publishable-key
+VITE_GEMINI_API_KEY=your-gemini-api-key
+VITE_GEMINI_MODEL=gemini-2.5-flash
+```
+
+Create `server/.env.local` with:
+
+```bash
+HOST=127.0.0.1
+PORT=8787
+ELEVENLABS_AGENTS=Jack-english:agent_8901km9v6qmnfz4rmb2yqkqe6kwe,turkish-Deniz:agent_4501km9vd5r4e0yv2v7da4w9smej
+ELEVENLABS_DEFAULT_AGENT_ID=agent_8901km9v6qmnfz4rmb2yqkqe6kwe
+ELEVENLABS_API_KEY=your-elevenlabs-api-key
+```
+
+If you only want one voice agent, the server still supports the older single-agent env vars:
+
+```bash
+ELEVENLABS_AGENT_NAME=Jack-english
+ELEVENLABS_AGENT_ID=agent_8901km9v6qmnfz4rmb2yqkqe6kwe
 ```
 
 Do not add privileged credentials to the frontend:

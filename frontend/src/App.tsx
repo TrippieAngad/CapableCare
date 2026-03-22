@@ -1,8 +1,18 @@
 import { FormEvent, useEffect, useState } from "react";
 import {
-  ConfidenceStatus,
-  DashboardData,
-  Role,
+  Activity,
+  ClipboardList,
+  HeartHandshake,
+  LayoutDashboard,
+  MessageSquare,
+  UserRound,
+} from "lucide-react";
+import { AnimeNavBar } from "@/components/ui/anime-navbar";
+import { ECareAIChat } from "@/components/ui/ecare-ai-chat";
+import { SparklesPreview } from "@/components/ui/sparkles-preview";
+import {
+  type DashboardData,
+  type Role,
   Task,
   getSession,
   initialData,
@@ -19,12 +29,16 @@ import {
 } from "./lib/portal";
 
 export function App() {
+  const [showAuth, setShowAuth] = useState(false);
   const [role, setRole] = useState<Role>("customer");
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [genderPreference, setGenderPreference] = useState("female");
+  const [durationHours, setDurationHours] = useState("2");
+  const [durationMinutes, setDurationMinutes] = useState("30");
   const [data, setData] = useState<DashboardData>(initialData);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
@@ -156,88 +170,99 @@ export function App() {
 
   if (!data.user) {
     return (
-      <div className="shell auth-shell">
-        <section className="hero">
-          <p className="eyebrow">CapableCare Trust Engine</p>
-          <h1>Family confidence, verified care, proactive coordination.</h1>
-          <p className="lede">
-            The MVP now combines verified visits, change detection, family collaboration, transportation coordination,
-            and weekly care briefs on top of Supabase-managed auth and data.
-          </p>
-          <div className="demo-cards">
-            <article>
-              <span>Customer test account</span>
-              <strong>family.capablecare@example.com</strong>
-              <p>Use the configured customer demo password in your local environment.</p>
-            </article>
-            <article>
-              <span>Caretaker test account</span>
-              <strong>caretaker.capablecare@example.com</strong>
-              <p>Use the configured caretaker demo password in your local environment.</p>
-            </article>
-          </div>
-        </section>
-
-        <section className="auth-card">
-          <div className="segmented">
-            {(["login", "signup"] as const).map((mode) => (
-              <button
-                key={mode}
-                className={authMode === mode ? "active" : ""}
-                onClick={() => setAuthMode(mode)}
-                type="button"
-              >
-                {mode === "login" ? "Sign in" : "Create account"}
+      <div className="shell auth-shell landing-shell">
+        {showAuth ? (
+          <section className="auth-card auth-card-elevated">
+            <div className="segmented">
+              {(["login", "signup"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  className={authMode === mode ? "active" : ""}
+                  onClick={() => setAuthMode(mode)}
+                  type="button"
+                >
+                  {mode === "login" ? "Sign in" : "Create account"}
+                </button>
+              ))}
+            </div>
+            <div className="segmented">
+              {(["customer", "caretaker"] as Role[]).map((nextRole) => (
+                <button
+                  key={nextRole}
+                  className={role === nextRole ? "active" : ""}
+                  onClick={() => setRole(nextRole)}
+                  type="button"
+                >
+                  {nextRole === "customer" ? "Family portal" : "Caretaker portal"}
+                </button>
+              ))}
+            </div>
+            <form className="stack" onSubmit={handleAuth}>
+              {authMode === "signup" ? (
+                <>
+                  <label>
+                    Full name
+                    <input value={name} onChange={(event) => setName(event.target.value)} required />
+                  </label>
+                  <label>
+                    Phone
+                    <input value={phone} onChange={(event) => setPhone(event.target.value)} required />
+                  </label>
+                </>
+              ) : null}
+              <label>
+                Email
+                <input value={email} onChange={(event) => setEmail(event.target.value)} required />
+              </label>
+              <label>
+                Password
+                <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+              </label>
+              {error ? <p className="error">{error}</p> : null}
+              <button className="primary" disabled={loading} type="submit">
+                {loading ? "Connecting..." : authMode === "login" ? "Enter portal" : "Create account"}
               </button>
-            ))}
-          </div>
-          <div className="segmented">
-            {(["customer", "caretaker"] as Role[]).map((nextRole) => (
-              <button
-                key={nextRole}
-                className={role === nextRole ? "active" : ""}
-                onClick={() => setRole(nextRole)}
-                type="button"
-              >
-                {nextRole === "customer" ? "Family portal" : "Caretaker portal"}
+              <button className="secondary" onClick={() => setShowAuth(false)} type="button">
+                Back
               </button>
-            ))}
-          </div>
-          <form className="stack" onSubmit={handleAuth}>
-            {authMode === "signup" ? (
-              <>
-                <label>
-                  Full name
-                  <input value={name} onChange={(event) => setName(event.target.value)} required />
-                </label>
-                <label>
-                  Phone
-                  <input value={phone} onChange={(event) => setPhone(event.target.value)} required />
-                </label>
-              </>
-            ) : null}
-            <label>
-              Email
-              <input value={email} onChange={(event) => setEmail(event.target.value)} required />
-            </label>
-            <label>
-              Password
-              <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required />
-            </label>
-            {error ? <p className="error">{error}</p> : null}
-            <button className="primary" disabled={loading} type="submit">
-              {loading ? "Connecting..." : authMode === "login" ? "Enter portal" : "Create account"}
-            </button>
-          </form>
-        </section>
+            </form>
+          </section>
+        ) : (
+          <section className="hero landing-hero">
+            <SparklesPreview onSignInClick={() => setShowAuth(true)} />
+          </section>
+        )}
       </div>
     );
   }
 
   const isCustomer = data.user.role === "customer";
   const tabs = isCustomer
-    ? ["overview", "coordination", "updates", "messages", "tasks", "plans", "support"]
-    : ["overview", "client", "coordination", "updates", "messages", "tasks"];
+    ? ["overview", "updates", "messages", "tasks", "plans", "support"]
+    : ["overview", "client", "updates", "messages", "tasks"];
+  const navItems = tabs.map((tab) => ({
+    name:
+      tab === "messages"
+        ? "Elder-care match maker"
+        : tab === "support"
+          ? "ECareAI"
+          : tab.charAt(0).toUpperCase() + tab.slice(1),
+    url: `#${tab}`,
+    icon:
+      tab === "overview"
+        ? LayoutDashboard
+        : tab === "updates"
+          ? Activity
+          : tab === "messages"
+            ? MessageSquare
+            : tab === "tasks"
+              ? ClipboardList
+              : tab === "plans"
+                ? HeartHandshake
+                : tab === "support" || tab === "client"
+                  ? UserRound
+                  : LayoutDashboard,
+  }));
   const latestUpdate = data.logs[0];
   const unreadCount = Math.max(data.messages.length - 1, 0);
 
@@ -249,48 +274,32 @@ export function App() {
           <h2>{isCustomer ? "Family confidence center" : "Verified caretaker workspace"}</h2>
         </div>
         <div className="topbar-actions">
-          <div className="notification-pill">Unread {unreadCount}</div>
           <button className="secondary" onClick={handleLogout} type="button">
             Log out
           </button>
         </div>
       </header>
 
-      <section className="summary-grid">
-        <article className="summary-card highlight">
-          <p>Care confidence</p>
-          <strong>{data.confidenceStatus}</strong>
-          <span>{data.confidenceSummary}</span>
-        </article>
-        <article className="summary-card">
-          <p>Latest status</p>
-          <strong>{latestUpdate?.status ?? "No updates"}</strong>
-          <span>{latestUpdate ? formatDateTime(latestUpdate.created_at) : "Waiting for first visit log"}</span>
-        </article>
-        <article className="summary-card">
-          <p>Upcoming visits</p>
-          <strong>{data.user.upcoming_visits?.length ?? 0}</strong>
-          <span>{isCustomer ? "Shared with family circle" : "Visible to the family circle"}</span>
-        </article>
-        <article className="summary-card">
-          <p>Open risks</p>
-          <strong>{data.alerts.filter((alert) => alert.status !== "Resolved").length}</strong>
-          <span>{data.transportRequests.length} transportation requests in coordination</span>
-        </article>
-      </section>
-
-      <nav className="tabs">
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            className={activeTab === tab ? "active" : ""}
-            onClick={() => setActiveTab(tab)}
-            type="button"
-          >
-            {tab}
-          </button>
-        ))}
-      </nav>
+      <AnimeNavBar
+        items={navItems}
+        activeItem={
+          activeTab === "messages"
+            ? "Elder-care match maker"
+            : activeTab === "support"
+              ? "ECareAI"
+            : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)
+        }
+        className="mb-16 mt-10"
+        onItemClick={(item) =>
+          setActiveTab(
+            item.name === "Elder-care match maker"
+              ? "messages"
+              : item.name === "ECareAI"
+                ? "support"
+              : item.name.toLowerCase(),
+          )
+        }
+      />
 
       <main className="content-grid">
         {!data.client ? (
@@ -306,21 +315,12 @@ export function App() {
         {activeTab === "overview" && data.client ? (
           <>
             <section className="panel">
-              <h3>Trust and verification</h3>
-              <div className="detail-grid">
+              <h3>Client</h3>
+              <div className="detail-grid compact-grid">
                 <div>
-                  <span>Client</span>
+                  <span>Name</span>
                   <strong>{data.client.full_name}</strong>
                   <p>{ageFromDate(data.client.dob)} years old • {formatDate(data.client.dob)}</p>
-                </div>
-                <div>
-                  <span>Latest verified visit</span>
-                  <strong>{latestUpdate?.verification.checklist_completed ? "Checklist complete" : "Checklist pending"}</strong>
-                  <p>
-                    {latestUpdate?.verification.checked_in_at
-                      ? `${formatDateTime(latestUpdate.verification.checked_in_at)} to ${formatDateTime(latestUpdate.verification.checked_out_at ?? undefined)}`
-                      : "No timestamped visit verification yet"}
-                  </p>
                 </div>
                 <div>
                   <span>Trust profile</span>
@@ -332,72 +332,73 @@ export function App() {
                   </p>
                 </div>
                 <div>
-                  <span>Family circle</span>
-                  <strong>{data.familyMembers.length} active relatives</strong>
-                  <p>{data.familyMembers.map((member) => member.relationship).join(", ") || "No shared access yet"}</p>
+                  <span>Latest verified visit</span>
+                  <strong>{latestUpdate?.verification.checklist_completed ? "Checklist complete" : "Checklist pending"}</strong>
+                  <p>
+                    {latestUpdate?.verification.checked_in_at
+                      ? `${formatDateTime(latestUpdate.verification.checked_in_at)} to ${formatDateTime(latestUpdate.verification.checked_out_at ?? undefined)}`
+                      : "No timestamped visit verification yet"}
+                  </p>
+                </div>
+                <div>
+                  <span>Upcoming visits</span>
+                  <strong>{data.user.upcoming_visits?.length ?? 0}</strong>
+                  <p>{isCustomer ? "Shared with family circle" : "Visible to the family circle"}</p>
                 </div>
               </div>
             </section>
 
             <section className="panel">
-              <h3>What changed this week</h3>
-              <div className="feed">
-                {data.changeSummary.map((item) => (
-                  <article className="feed-item" key={item.label}>
-                    <div className="feed-header">
-                      <strong>{item.label}</strong>
-                      <span className={`status-badge ${item.direction === "up" ? "good" : item.direction === "down" ? "urgent" : "completed"}`}>
-                        {item.direction}
-                      </span>
-                    </div>
-                    <p>{item.detail}</p>
+              <h3>Family collaboration</h3>
+              <div className="feed compact-feed">
+                {data.familyMembers.length ? (
+                  data.familyMembers.map((member) => (
+                    <article className="feed-item" key={member.id}>
+                      <div className="feed-header">
+                        <strong>{member.name}</strong>
+                        <span className="status-badge completed">{member.relationship}</span>
+                      </div>
+                      <p>{member.email}</p>
+                      <p>{member.permissions.join(", ")}{member.ownership_label ? ` • ${member.ownership_label}` : ""}</p>
+                    </article>
+                  ))
+                ) : (
+                  <article className="feed-item">
+                    <strong>No shared access yet</strong>
+                    <p>Add relatives to keep updates and coordination visible to the full family circle.</p>
                   </article>
-                ))}
+                )}
               </div>
             </section>
 
             <section className="panel wide">
-              <h3>Weekly family brief</h3>
-              {data.weeklyBrief ? (
-                <div className="detail-grid">
-                  <div>
-                    <span>Summary</span>
-                    <strong>{data.weeklyBrief.summary}</strong>
-                    <p>Generated {formatDateTime(data.weeklyBrief.generated_at)}</p>
-                  </div>
-                  <div>
-                    <span>Concerns</span>
-                    <ul className="plain-list compact">
-                      {data.weeklyBrief.concerns.map((concern) => (
-                        <li key={concern}>{concern}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <span>Next actions</span>
-                    <ul className="plain-list compact">
-                      {data.weeklyBrief.next_steps.map((step) => (
-                        <li key={step}>{step}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <span>Open alerts</span>
-                    <ul className="plain-list compact">
-                      {data.alerts.map((alert) => (
-                        <li key={alert.id}>{alert.severity} {alert.type}: {alert.summary}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              ) : (
-                <p className="supporting-copy">No weekly brief has been generated yet.</p>
-              )}
+              <h3>What changed this week</h3>
+              <div className="feed compact-feed horizontal-feed">
+                {data.changeSummary.length ? (
+                  data.changeSummary.map((item) => (
+                    <article className="feed-item" key={item.label}>
+                      <div className="feed-header">
+                        <strong>{item.label}</strong>
+                        <span className={`status-badge ${item.direction === "up" ? "good" : item.direction === "down" ? "urgent" : "completed"}`}>
+                          {item.direction}
+                        </span>
+                      </div>
+                      <p>{item.detail}</p>
+                    </article>
+                  ))
+                ) : (
+                  <article className="feed-item">
+                    <strong>No major changes logged</strong>
+                    <p>New visit logs and assessments will appear here once care updates come in.</p>
+                  </article>
+                )}
+              </div>
             </section>
           </>
         ) : null}
 
         {activeTab === "client" && data.client ? (
+
           <>
             <section className="panel wide">
               <h3>Care profile and plan</h3>
@@ -445,76 +446,6 @@ export function App() {
           </>
         ) : null}
 
-        {activeTab === "coordination" && data.client ? (
-          <>
-            <section className="panel">
-              <h3>Family collaboration</h3>
-              <div className="feed">
-                {data.familyMembers.map((member) => (
-                  <article className="feed-item" key={member.id}>
-                    <div className="feed-header">
-                      <strong>{member.name}</strong>
-                      <span className="status-badge completed">{member.relationship}</span>
-                    </div>
-                    <p>{member.email}</p>
-                    <p>{member.permissions.join(", ")}{member.ownership_label ? ` • ${member.ownership_label}` : ""}</p>
-                  </article>
-                ))}
-              </div>
-            </section>
-
-            <section className="panel">
-              <h3>Appointments and rides</h3>
-              <div className="feed">
-                {data.appointments.map((appointment) => (
-                  <article className="feed-item" key={appointment.id}>
-                    <div className="feed-header">
-                      <strong>{appointment.title}</strong>
-                      <span className={`status-badge ${appointment.status.toLowerCase().replaceAll(" ", "-")}`}>{appointment.status}</span>
-                    </div>
-                    <p>{appointment.provider}</p>
-                    <p>{formatDateTime(appointment.scheduled_for)}{appointment.transport_needed ? " • transportation required" : ""}</p>
-                  </article>
-                ))}
-                {data.transportRequests.map((request) => (
-                  <article className="feed-item" key={request.id}>
-                    <div className="feed-header">
-                      <strong>Transportation coordination</strong>
-                      <span className={`status-badge ${request.status.toLowerCase().replaceAll(" ", "-")}`}>{request.status}</span>
-                    </div>
-                    <p>{request.pickup_location} to {request.dropoff_location}</p>
-                    <p>{formatDateTime(request.scheduled_for)}{request.coordination_notes ? ` • ${request.coordination_notes}` : ""}</p>
-                  </article>
-                ))}
-              </div>
-            </section>
-
-            <section className="panel wide">
-              <h3>Proactive alerts and incidents</h3>
-              <div className="detail-grid">
-                <div>
-                  <span>Risk alerts</span>
-                  <ul className="plain-list compact">
-                    {data.alerts.map((alert) => (
-                      <li key={alert.id}>{alert.severity} {alert.type}: {alert.summary}</li>
-                    ))}
-                  </ul>
-                </div>
-                <div>
-                  <span>Incident trail</span>
-                  <ul className="plain-list compact">
-                    {data.incidents.map((incident) => (
-                      <li key={incident.id}>
-                        {incident.severity}: {incident.summary}
-                        {incident.acknowledged_by_family_at ? ` • acknowledged ${formatDateTime(incident.acknowledged_by_family_at)}` : " • awaiting family acknowledgment"}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </section>
-          </>
-        ) : null}
 
         {activeTab === "updates" && data.client ? (
           <>
@@ -656,29 +587,73 @@ export function App() {
         {activeTab === "messages" && data.thread ? (
           <>
             <section className="panel">
-              <h3>Conversation</h3>
-              <div className="messages">
-                {data.messages.map((message) => (
-                  <article className={`message ${message.sender_id === data.user?.id ? "mine" : ""}`} key={message.id}>
-                    <p>{message.content}</p>
-                    <span>{formatDateTime(message.created_at)}</span>
-                  </article>
-                ))}
+              <div className="panel-header">
+                <h3>Elder-care match maker</h3>
               </div>
+              <div className="detail-grid">
+                <div>
+                  <span>Eldercare buddy match</span>
+                  <strong>Jordan Lee · 94% match</strong>
+                  <p>
+                    <strong>4,820 elder points</strong>
+                  </p>
+                  <p>Likability · 4.9/5</p>
+                  <p>Punctuality · 98%</p>
+                  <p>Reliability · 4.8/5</p>
+                </div>
+                <div>
+                  <span>Match summary</span>
+                  <strong>
+                    {genderPreference.charAt(0).toUpperCase() + genderPreference.slice(1)} preference · {durationHours}h {durationMinutes}m
+                  </strong>
+                  <p>Top fit for weekday afternoon visits, mobility support, and medication reminder continuity.</p>
+                  <p>Families rate communication as calm, clear, and highly dependable.</p>
+                </div>
+              </div>
+              <button className="primary semi-large-button" type="button">
+                want to meet someone new? try random
+              </button>
             </section>
             <section className="panel">
-              <h3>Send message</h3>
-              <form className="stack" onSubmit={submitMessage}>
+              <h3>Filter widget</h3>
+              <form className="stack" onSubmit={(event) => event.preventDefault()}>
                 <label>
-                  Message
-                  <textarea name="content" placeholder="Share an update or request." required />
+                  Gender preference
+                  <select value={genderPreference} onChange={(event) => setGenderPreference(event.target.value)}>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </select>
                 </label>
+                <div className="detail-grid">
+                  <label>
+                    Duration hours
+                    <input
+                      inputMode="numeric"
+                      min="0"
+                      onChange={(event) => setDurationHours(event.target.value)}
+                      type="number"
+                      value={durationHours}
+                    />
+                  </label>
+                  <label>
+                    Duration minutes
+                    <input
+                      inputMode="numeric"
+                      max="59"
+                      min="0"
+                      onChange={(event) => setDurationMinutes(event.target.value)}
+                      type="number"
+                      value={durationMinutes}
+                    />
+                  </label>
+                </div>
                 <label>
-                  Attachment URL
-                  <input name="attachment_url" placeholder="Optional file link" />
+                  Match notes
+                  <textarea placeholder="Add preferences like mobility support, language comfort, or medication reminders." />
                 </label>
                 <button className="primary" type="submit">
-                  Send
+                  Find eldercare buddy
                 </button>
               </form>
             </section>
@@ -791,52 +766,7 @@ export function App() {
           </section>
         ) : null}
 
-        {activeTab === "support" && isCustomer ? (
-          <>
-            <section className="panel">
-              <h3>Open support ticket</h3>
-              <form className="stack" onSubmit={submitSupportTicket}>
-                <label>
-                  Category
-                  <select name="category" defaultValue="Billing">
-                    <option value="Billing">Billing</option>
-                    <option value="Caretaker Concern">Caretaker Concern</option>
-                    <option value="Technical">Technical</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </label>
-                <label>
-                  Description
-                  <textarea name="description" placeholder="Describe the issue for the CapableCare team." required />
-                </label>
-                <label>
-                  Attachment URL
-                  <input name="attachment_url" placeholder="Optional file link" />
-                </label>
-                <button className="primary" type="submit">
-                  Submit ticket
-                </button>
-              </form>
-            </section>
-            <section className="panel">
-              <h3>Ticket status</h3>
-              <div className="feed">
-                {data.tickets.map((ticket) => (
-                  <article className="feed-item" key={ticket.id}>
-                    <div className="feed-header">
-                      <div>
-                        <strong>{ticket.category}</strong>
-                        <p>{formatDateTime(ticket.created_at)}</p>
-                      </div>
-                      <span className={`status-badge ${ticket.status.toLowerCase().replaceAll(" ", "-")}`}>{ticket.status}</span>
-                    </div>
-                    <p>{ticket.description}</p>
-                  </article>
-                ))}
-              </div>
-            </section>
-          </>
-        ) : null}
+        {activeTab === "support" && isCustomer ? <ECareAIChat /> : null}
       </main>
     </div>
   );
