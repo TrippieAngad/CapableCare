@@ -27,6 +27,55 @@ import {
   switchPlan as updatePlan,
   updateTask as patchTask,
 } from "./lib/portal";
+import {
+  CareRecipientStaticProfile,
+  demoCareRecipients,
+} from "./lib/caretakerProfiles";
+
+type CareRecipientView = {
+  id: string;
+  name: string;
+  ageLabel: string;
+  address: string;
+  statusLabel: string;
+  statusTone: "tone-good" | "tone-watch" | "tone-alert";
+  summary: string;
+  highlights: string[];
+  tasks: Array<{
+    id: string;
+    title: string;
+    priority: string;
+    status: string;
+  }>;
+  schedule: Array<{
+    id: string;
+    title: string;
+    when: string;
+    detail: string;
+  }>;
+  careGoals: string[];
+  routines: string[];
+  restrictions: string[];
+  emergencyContact: {
+    name: string;
+    phone: string;
+  };
+  updates: Array<{
+    id: string;
+    title: string;
+    status: "Good" | "Needs Attention" | "Urgent";
+    detail: string;
+    time: string;
+  }>;
+  messages: Array<{
+    id: string;
+    author: string;
+    content: string;
+    time: string;
+    incoming: boolean;
+  }>;
+  isLive: boolean;
+};
 
 export function App() {
   const [showAuth, setShowAuth] = useState(false);
@@ -43,6 +92,7 @@ export function App() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
   const [error, setError] = useState<string | null>(null);
+  const [selectedRecipientId, setSelectedRecipientId] = useState<string | null>(null);
 
   async function refreshDashboard() {
     setLoading(true);
@@ -65,6 +115,15 @@ export function App() {
   useEffect(() => {
     void refreshDashboard();
   }, []);
+
+  useEffect(() => {
+    if (!data.user || data.user.role !== "caretaker") {
+      setSelectedRecipientId(null);
+      return;
+    }
+    if (selectedRecipientId) return;
+    setSelectedRecipientId(data.client?.id ?? demoCareRecipients[0]?.id ?? null);
+  }, [data.user, data.client?.id, selectedRecipientId]);
 
   async function handleAuth(event: FormEvent) {
     event.preventDefault();
@@ -237,10 +296,96 @@ export function App() {
   }
 
   const isCustomer = data.user.role === "customer";
+  const currentUserId = data.user.id;
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const nextVisit = data.user.upcoming_visits[0] ?? null;
+  const overallStatus = mapConfidenceToTone(data.confidenceStatus);
+  const liveRecipient: CareRecipientView | null =
+    !isCustomer && data.client
+      ? {
+          id: data.client.id,
+          name: data.client.full_name,
+          ageLabel: `${ageFromDate(data.client.dob)} years old`,
+          address: data.client.address,
+          statusLabel: overallStatus.label,
+          statusTone: overallStatus.tone,
+          summary: data.confidenceSummary,
+          highlights: [
+            data.carePlan?.routines[0] ?? "Routine details pending",
+            data.carePlan?.restrictions[0] ?? "No critical restrictions noted",
+            nextVisit ? `Next visit: ${formatDateTime(nextVisit.starts_at)}` : "No upcoming visit scheduled",
+          ],
+          tasks: data.tasks.slice(0, 3).map((task) => ({
+            id: task.id,
+            title: task.title,
+            priority: task.priority,
+            status:
+              task.status === "Completed"
+                ? "On Track"
+                : task.due_date && isSameDay(new Date(task.due_date), todayStart)
+                  ? "Today"
+                  : task.status === "In Progress"
+                    ? "Needs Follow-up"
+                    : "Upcoming",
+          })),
+          schedule: [
+            ...data.user.upcoming_visits.slice(0, 2).map((visit) => ({
+              id: visit.id,
+              title: visit.type,
+              when: formatDateTime(visit.starts_at),
+              detail: "Scheduled caregiver visit",
+            })),
+            ...data.appointments.slice(0, 2).map((appointment) => ({
+              id: appointment.id,
+              title: appointment.title,
+              when: formatDateTime(appointment.scheduled_for),
+              detail: `${appointment.provider}${appointment.transport_needed ? " | transportation needed" : ""}`,
+            })),
+          ].slice(0, 3),
+          careGoals: data.carePlan?.goals ?? [],
+          routines: data.carePlan?.routines ?? [],
+          restrictions: data.carePlan?.restrictions ?? [],
+          emergencyContact: {
+            name: data.client.emergency_contacts[0]?.name ?? "Not set",
+            phone: data.client.emergency_contacts[0]?.phone ?? "No number available",
+          },
+          updates: data.logs.slice(0, 3).map((log) => ({
+            id: log.id,
+            title: `${log.visit_type} visit`,
+            status: log.status,
+            detail: summarizeText(log.notes, 120),
+            time: formatDateTime(log.created_at),
+          })),
+          messages: data.messages.slice(-3).map((message) => ({
+            id: message.id,
+            author:
+              message.sender_id === currentUserId
+                ? "You"
+                : data.familyMembers[0]?.name ?? data.caretakerProfile?.name ?? "Care circle",
+            content: message.content,
+            time: formatDateTime(message.created_at),
+            incoming: message.sender_id !== currentUserId,
+          })),
+          isLive: true,
+        }
+      : null;
+  const recipientProfiles: CareRecipientView[] = [
+    ...(liveRecipient ? [liveRecipient] : []),
+    ...demoCareRecipients.map(mapStaticRecipient),
+  ];
+  const selectedRecipient = !isCustomer
+    ? recipientProfiles.find((recipient) => recipient.id === selectedRecipientId) ??
+      recipientProfiles[0] ??
+      null
+    : null;
+  const showingLiveRecipient = !isCustomer && Boolean(selectedRecipient?.isLive);
+  const showingDemoRecipient = !isCustomer && Boolean(selectedRecipient && !selectedRecipient.isLive);
   const tabs = isCustomer
     ? ["overview", "updates", "messages", "tasks", "plans", "support"]
     : ["overview", "client", "updates", "messages", "tasks"];
   const navItems = tabs.map((tab) => ({
+    id: tab,
     name:
       tab === "messages"
         ? "Elder-care match maker"
@@ -265,13 +410,19 @@ export function App() {
   }));
   const latestUpdate = data.logs[0];
   const unreadCount = Math.max(data.messages.length - 1, 0);
+  const currentViewLabel = isCustomer ? "Elderly View" : "Caretaker View";
 
   return (
     <div className="shell">
       <header className="topbar">
-        <div>
+        <div className="topbar-section">
           <p className="eyebrow">CapableCare Portal</p>
           <h2>{isCustomer ? "Family confidence center" : "Verified caretaker workspace"}</h2>
+          <p>Logged in as: {data.user.name}</p>
+        </div>
+        <div className="topbar-center">
+          <p className="eyebrow">Current View</p>
+          <strong>{currentViewLabel}</strong>
         </div>
         <div className="topbar-actions">
           <button className="secondary" onClick={handleLogout} type="button">
@@ -282,23 +433,9 @@ export function App() {
 
       <AnimeNavBar
         items={navItems}
-        activeItem={
-          activeTab === "messages"
-            ? "Elder-care match maker"
-            : activeTab === "support"
-              ? "ECareAI"
-            : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)
-        }
+        activeItem={activeTab}
         className="mb-16 mt-10"
-        onItemClick={(item) =>
-          setActiveTab(
-            item.name === "Elder-care match maker"
-              ? "messages"
-              : item.name === "ECareAI"
-                ? "support"
-              : item.name.toLowerCase(),
-          )
-        }
+        onItemClick={(item) => setActiveTab(item.id)}
       />
 
       <main className="content-grid">
@@ -312,15 +449,92 @@ export function App() {
           </section>
         ) : null}
 
-        {activeTab === "overview" && data.client ? (
+        {!isCustomer && selectedRecipient ? (
+          <section className="panel wide">
+            <div className="section-heading">
+              <p className="section-kicker">Profile Select</p>
+              <h3>Choose who you&apos;re caring for</h3>
+              <p className="supporting-copy">
+                Keep this screen focused on the essentials: current status, key care notes, and the next few tasks.
+              </p>
+            </div>
+            <div className="recipient-grid">
+              {recipientProfiles.map((recipient) => (
+                <article
+                  className={`recipient-card ${selectedRecipient?.id === recipient.id ? "selected" : ""}`}
+                  key={recipient.id}
+                >
+                  <div className="recipient-card-header">
+                    <div>
+                      <p className="recipient-name">{recipient.name}</p>
+                      <span>{recipient.ageLabel} | {recipient.address}</span>
+                    </div>
+                    <span
+                      className={`status-badge ${
+                        recipient.statusTone === "tone-alert"
+                          ? "urgent"
+                          : recipient.statusTone === "tone-watch"
+                            ? "needs-attention"
+                            : "good"
+                      }`}
+                    >
+                      {recipient.statusLabel}
+                    </span>
+                  </div>
+                  <p className="recipient-summary">{recipient.summary}</p>
+                  <div className="recipient-mini-section">
+                    <strong>Important</strong>
+                    <ul className="plain-list compact">
+                      {recipient.highlights.slice(0, 3).map((highlight) => (
+                        <li key={highlight}>{highlight}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="recipient-mini-section">
+                    <strong>Tasks</strong>
+                    <div className="recipient-task-stack">
+                      {recipient.tasks.slice(0, 3).map((task) => (
+                        <div className="recipient-task-row" key={task.id}>
+                          <span>{task.title}</span>
+                          <span>{task.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="button-row">
+                    <button
+                      className="secondary"
+                      onClick={() => setSelectedRecipientId(recipient.id)}
+                      type="button"
+                    >
+                      Preview
+                    </button>
+                    <button
+                      className="primary"
+                      onClick={() => {
+                        setSelectedRecipientId(recipient.id);
+                        setActiveTab(recipient.isLive ? "client" : "updates");
+                      }}
+                      type="button"
+                    >
+                      Open Profile
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "overview" && ((isCustomer && data.client) || showingLiveRecipient) ? (
           <>
             <section className="panel">
               <h3>Client</h3>
               <div className="detail-grid compact-grid">
                 <div>
                   <span>Name</span>
-                  <strong>{data.client.full_name}</strong>
-                  <p>{ageFromDate(data.client.dob)} years old • {formatDate(data.client.dob)}</p>
+                  <strong>{data.client!.full_name}</strong>
+                  <p>{ageFromDate(data.client!.dob)} years old • {formatDate(data.client!.dob)}</p>
                 </div>
                 <div>
                   <span>Trust profile</span>
@@ -397,7 +611,66 @@ export function App() {
           </>
         ) : null}
 
-        {activeTab === "client" && data.client ? (
+        {activeTab === "overview" && showingDemoRecipient && selectedRecipient ? (
+          <>
+            <section className="panel">
+              <div className="section-heading">
+                <p className="section-kicker">Snapshot</p>
+                <h3>{selectedRecipient.name}</h3>
+              </div>
+              <div className="detail-grid compact-grid">
+                <div>
+                  <span>Status</span>
+                  <strong>{selectedRecipient.statusLabel}</strong>
+                  <p>{selectedRecipient.summary}</p>
+                </div>
+                <div>
+                  <span>Emergency contact</span>
+                  <strong>{selectedRecipient.emergencyContact.name}</strong>
+                  <p>{selectedRecipient.emergencyContact.phone}</p>
+                </div>
+              </div>
+            </section>
+
+            <section className="panel">
+              <div className="section-heading">
+                <p className="section-kicker">Today</p>
+                <h3>Key tasks</h3>
+              </div>
+              <div className="task-list">
+                {selectedRecipient.tasks.map((task) => (
+                  <article className="task-item" key={task.id}>
+                    <div>
+                      <strong>{task.title}</strong>
+                      <p>{task.priority} priority</p>
+                    </div>
+                    <span className="status-badge completed">{task.status}</span>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="panel wide">
+              <div className="section-heading">
+                <p className="section-kicker">Schedule</p>
+                <h3>Upcoming care items</h3>
+              </div>
+              <div className="feed compact-feed horizontal-feed">
+                {selectedRecipient.schedule.map((item) => (
+                  <article className="feed-item" key={item.id}>
+                    <div className="feed-header">
+                      <strong>{item.title}</strong>
+                      <span>{item.when}</span>
+                    </div>
+                    <p>{item.detail}</p>
+                  </article>
+                ))}
+              </div>
+            </section>
+          </>
+        ) : null}
+
+        {activeTab === "client" && data.client && (isCustomer || showingLiveRecipient) ? (
 
           <>
             <section className="panel wide">
@@ -447,7 +720,73 @@ export function App() {
         ) : null}
 
 
-        {activeTab === "updates" && data.client ? (
+        {activeTab === "client" && showingDemoRecipient && selectedRecipient ? (
+          <>
+            <section className="panel wide">
+              <div className="section-heading">
+                <p className="section-kicker">Schedule</p>
+                <h3>{selectedRecipient.name}&apos;s upcoming care items</h3>
+              </div>
+              <div className="feed">
+                {selectedRecipient.schedule.map((item) => (
+                  <article className="feed-item" key={item.id}>
+                    <div className="feed-header">
+                      <strong>{item.title}</strong>
+                      <span>{item.when}</span>
+                    </div>
+                    <p>{item.detail}</p>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="panel">
+              <div className="section-heading">
+                <p className="section-kicker">Client Snapshot</p>
+                <h3>{selectedRecipient.name}</h3>
+              </div>
+              <div className="detail-grid">
+                <div>
+                  <span>Age</span>
+                  <strong>{selectedRecipient.ageLabel}</strong>
+                  <p>{selectedRecipient.address}</p>
+                </div>
+                <div>
+                  <span>Key notes</span>
+                  <strong>{selectedRecipient.careGoals[0] ?? "Care goals pending"}</strong>
+                  <p>{selectedRecipient.restrictions[0] ?? selectedRecipient.summary}</p>
+                </div>
+              </div>
+            </section>
+
+            <section className="panel">
+              <div className="section-heading">
+                <p className="section-kicker">Care Plan</p>
+                <h3>Goals and routines</h3>
+              </div>
+              <div className="detail-grid">
+                <div>
+                  <span>Goals</span>
+                  <ul className="plain-list compact">
+                    {selectedRecipient.careGoals.slice(0, 3).map((goal) => (
+                      <li key={goal}>{goal}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <span>Daily routines</span>
+                  <ul className="plain-list compact">
+                    {selectedRecipient.routines.slice(0, 3).map((routine) => (
+                      <li key={routine}>{routine}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </section>
+          </>
+        ) : null}
+
+        {activeTab === "updates" && data.client && (isCustomer || showingLiveRecipient) ? (
           <>
             {!isCustomer ? (
               <section className="panel">
@@ -584,7 +923,37 @@ export function App() {
           </>
         ) : null}
 
-        {activeTab === "messages" && data.thread ? (
+        {activeTab === "updates" && showingDemoRecipient && selectedRecipient ? (
+          <>
+            <section className="panel">
+              <div className="section-heading">
+                <p className="section-kicker">Recent Updates</p>
+                <h3>Latest notes for {selectedRecipient.name}</h3>
+                <p className="supporting-copy">
+                  Demo profile content is read-only here. The live linked client still supports visit submission.
+                </p>
+              </div>
+              <div className="feed">
+                {selectedRecipient.updates.map((update) => (
+                  <article className="feed-item" key={update.id}>
+                    <div className="feed-header">
+                      <div>
+                        <strong>{update.title}</strong>
+                        <p>{update.time}</p>
+                      </div>
+                      <span className={`status-badge ${update.status.toLowerCase().replaceAll(" ", "-")}`}>
+                        {update.status}
+                      </span>
+                    </div>
+                    <p>{update.detail}</p>
+                  </article>
+                ))}
+              </div>
+            </section>
+          </>
+        ) : null}
+
+        {activeTab === "messages" && data.thread && (isCustomer || showingLiveRecipient) ? (
           <>
             <section className="panel">
               <div className="panel-header">
@@ -660,7 +1029,27 @@ export function App() {
           </>
         ) : null}
 
-        {activeTab === "tasks" && data.client ? (
+        {activeTab === "messages" && showingDemoRecipient && selectedRecipient ? (
+          <>
+            <section className="panel">
+              <div className="section-heading">
+                <p className="section-kicker">Messages</p>
+                <h3>{selectedRecipient.name}&apos;s care conversation</h3>
+              </div>
+              <div className="messages">
+                {selectedRecipient.messages.map((message) => (
+                  <article className={`message ${message.incoming ? "" : "mine"}`} key={message.id}>
+                    <strong>{message.author}</strong>
+                    <p>{message.content}</p>
+                    <span>{message.time}</span>
+                  </article>
+                ))}
+              </div>
+            </section>
+          </>
+        ) : null}
+
+        {activeTab === "tasks" && data.client && (isCustomer || showingLiveRecipient) ? (
           <>
             {isCustomer ? (
               <section className="panel">
@@ -736,6 +1125,26 @@ export function App() {
               </div>
             </section>
           </>
+        ) : null}
+
+        {activeTab === "tasks" && showingDemoRecipient && selectedRecipient ? (
+          <section className="panel wide">
+            <div className="section-heading">
+              <p className="section-kicker">Task Queue</p>
+              <h3>{selectedRecipient.name}&apos;s active tasks</h3>
+            </div>
+            <div className="task-list">
+              {selectedRecipient.tasks.map((task) => (
+                <article className="task-item" key={task.id}>
+                  <div>
+                    <strong>{task.title}</strong>
+                    <p>{task.priority} priority</p>
+                  </div>
+                  <span className="status-badge completed">{task.status}</span>
+                </article>
+              ))}
+            </div>
+          </section>
         ) : null}
 
         {activeTab === "plans" && isCustomer ? (
@@ -817,4 +1226,63 @@ function numberOrNull(value: string) {
   if (!value) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function mapStaticRecipient(profile: CareRecipientStaticProfile): CareRecipientView {
+  return {
+    id: profile.id,
+    name: profile.name,
+    ageLabel: `${profile.age} years old`,
+    address: profile.address,
+    statusLabel: profile.statusLabel,
+    statusTone: profile.statusTone,
+    summary: profile.summary,
+    highlights: profile.highlights,
+    tasks: profile.tasks,
+    schedule: profile.schedule,
+    careGoals: profile.careGoals,
+    routines: profile.routines,
+    restrictions: profile.restrictions,
+    emergencyContact: profile.emergencyContact,
+    updates: profile.updates,
+    messages: profile.messages,
+    isLive: false,
+  };
+}
+
+function summarizeText(value: string, limit: number) {
+  const normalized = value.trim().replace(/\s+/g, " ");
+  if (normalized.length <= limit) {
+    return normalized;
+  }
+  return `${normalized.slice(0, limit - 1).trimEnd()}…`;
+}
+
+function isSameDay(left: Date, right: Date) {
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+  );
+}
+
+function mapConfidenceToTone(confidenceStatus: DashboardData["confidenceStatus"]) {
+  if (confidenceStatus === "Action Needed") {
+    return {
+      label: "Action Needed",
+      tone: "tone-alert" as const,
+    };
+  }
+
+  if (confidenceStatus === "Watch") {
+    return {
+      label: "Watch",
+      tone: "tone-watch" as const,
+    };
+  }
+
+  return {
+    label: "Stable",
+    tone: "tone-good" as const,
+  };
 }

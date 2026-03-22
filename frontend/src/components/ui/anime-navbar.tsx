@@ -6,6 +6,7 @@ import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
+  id: string;
   name: string;
   url: string;
   icon: LucideIcon;
@@ -22,7 +23,7 @@ interface NavBarProps {
 export function AnimeNavBar({
   items,
   className,
-  defaultActive = "Home",
+  defaultActive = "overview",
   activeItem,
   onItemClick,
 }: NavBarProps) {
@@ -57,17 +58,17 @@ export function AnimeNavBar({
         >
           {items.map((item) => {
             const Icon = item.icon;
-            const isActive = internalActive === item.name;
-            const isHovered = hoveredTab === item.name;
+            const isActive = internalActive === item.id;
+            const isHovered = hoveredTab === item.id;
 
             return (
               <button
-                key={item.name}
+                key={item.id}
                 onClick={() => {
-                  setInternalActive(item.name);
+                  setInternalActive(item.id);
                   onItemClick?.(item);
                 }}
-                onMouseEnter={() => setHoveredTab(item.name)}
+                onMouseEnter={() => setHoveredTab(item.id)}
                 onMouseLeave={() => setHoveredTab(null)}
                 className={cn(
                   "relative cursor-pointer rounded-full px-4 py-3 text-sm font-semibold text-white/70 transition-all duration-300 hover:text-white md:px-6",
@@ -133,7 +134,7 @@ export function AnimeNavBar({
                       <motion.div
                         className="absolute left-1/2 h-10 w-10 -translate-x-1/2 rounded-full bg-white"
                         animate={
-                          hoveredTab === item.name
+                          hoveredTab === item.id
                             ? {
                                 scale: [1, 1.1, 1],
                                 rotate: [0, -5, 5, 0],
@@ -155,7 +156,7 @@ export function AnimeNavBar({
                         <motion.div
                           className="absolute h-2 w-2 rounded-full bg-black"
                           animate={
-                            hoveredTab === item.name
+                            hoveredTab === item.id
                               ? {
                                   scaleY: [1, 0.2, 1],
                                   transition: {
@@ -170,7 +171,7 @@ export function AnimeNavBar({
                         <motion.div
                           className="absolute h-2 w-2 rounded-full bg-black"
                           animate={
-                            hoveredTab === item.name
+                            hoveredTab === item.id
                               ? {
                                   scaleY: [1, 0.2, 1],
                                   transition: {
@@ -184,25 +185,25 @@ export function AnimeNavBar({
                         />
                         <motion.div
                           className="absolute h-1.5 w-2 rounded-full bg-pink-300"
-                          animate={{ opacity: hoveredTab === item.name ? 0.8 : 0.6 }}
+                          animate={{ opacity: hoveredTab === item.id ? 0.8 : 0.6 }}
                           style={{ left: "15%", top: "55%" }}
                         />
                         <motion.div
                           className="absolute h-1.5 w-2 rounded-full bg-pink-300"
-                          animate={{ opacity: hoveredTab === item.name ? 0.8 : 0.6 }}
+                          animate={{ opacity: hoveredTab === item.id ? 0.8 : 0.6 }}
                           style={{ right: "15%", top: "55%" }}
                         />
                         <motion.div
                           className="absolute h-2 w-4 rounded-full border-b-2 border-black"
                           animate={
-                            hoveredTab === item.name
+                            hoveredTab === item.id
                               ? { scaleY: 1.5, y: -1 }
                               : { scaleY: 1, y: 0 }
                           }
                           style={{ left: "30%", top: "60%" }}
                         />
                         <AnimatePresence>
-                          {hoveredTab === item.name && (
+                          {hoveredTab === item.id && (
                             <>
                               <motion.div
                                 initial={{ opacity: 0, scale: 0 }}
@@ -228,7 +229,7 @@ export function AnimeNavBar({
                       <motion.div
                         className="absolute -bottom-1 left-1/2 h-4 w-4 -translate-x-1/2"
                         animate={
-                          hoveredTab === item.name
+                          hoveredTab === item.id
                             ? {
                                 y: [0, -4, 0],
                                 transition: {

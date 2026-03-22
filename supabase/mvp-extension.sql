@@ -145,6 +145,40 @@ create table if not exists public.caretaker_metrics (
   verified_visit_rate numeric(5,2) not null default 0
 );
 
+create table if not exists public.document_sources (
+  id uuid primary key default gen_random_uuid(),
+  elderly_client_id uuid references public.elderly_clients(id) on delete cascade,
+  title text not null,
+  source_kind text not null default 'pdf' check (source_kind in ('pdf', 'guide', 'note')),
+  source_scope text not null default 'global' check (source_scope in ('global', 'client')),
+  storage_path text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.document_chunks (
+  id uuid primary key default gen_random_uuid(),
+  source_id uuid not null references public.document_sources(id) on delete cascade,
+  elderly_client_id uuid references public.elderly_clients(id) on delete cascade,
+  chunk_index integer not null,
+  heading text,
+  content text not null,
+  embedding jsonb not null,
+  token_estimate integer,
+  created_at timestamptz not null default timezone('utc', now()),
+  unique (source_id, chunk_index)
+);
+
+create index if not exists document_sources_scope_client_idx
+  on public.document_sources (source_scope, elderly_client_id, created_at desc);
+
+create index if not exists document_chunks_source_idx
+  on public.document_chunks (source_id, chunk_index);
+
+create index if not exists document_chunks_client_idx
+  on public.document_chunks (elderly_client_id, created_at desc);
+
 alter table public.care_plans enable row level security;
 alter table public.visit_assessments enable row level security;
 alter table public.incident_reports enable row level security;
@@ -154,6 +188,8 @@ alter table public.family_members enable row level security;
 alter table public.appointments enable row level security;
 alter table public.transport_requests enable row level security;
 alter table public.caretaker_metrics enable row level security;
+alter table public.document_sources enable row level security;
+alter table public.document_chunks enable row level security;
 
 drop policy if exists "visit assessments participant read" on public.visit_assessments;
 create policy "visit assessments participant read" on public.visit_assessments
@@ -217,4 +253,20 @@ for select using (
     where ec.assigned_caretaker_id = caretaker_metrics.caretaker_id
       and fl.customer_user_id = auth.uid()
   )
+);
+
+drop policy if exists "document sources participant read" on public.document_sources;
+create policy "document sources participant read" on public.document_sources
+for select using (
+  elderly_client_id is null
+  or public.is_customer_for_client(elderly_client_id)
+  or public.is_caretaker_for_client(elderly_client_id)
+);
+
+drop policy if exists "document chunks participant read" on public.document_chunks;
+create policy "document chunks participant read" on public.document_chunks
+for select using (
+  elderly_client_id is null
+  or public.is_customer_for_client(elderly_client_id)
+  or public.is_caretaker_for_client(elderly_client_id)
 );

@@ -9,7 +9,9 @@ import { CanvasRevealEffect } from "@/components/ui/canvas-effect";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { VoicePoweredOrb } from "@/components/ui/voice-powered-orb";
+import type { ChatCitation } from "@/lib/gemini";
 import { generateGeminiReply } from "@/lib/gemini";
+import { getSession } from "@/lib/portal";
 import { cn } from "@/lib/utils";
 import { buildVoiceApiUrl } from "@/lib/voice-api";
 
@@ -17,6 +19,7 @@ type ChatMessage = {
   id: string;
   role: "assistant" | "user";
   text: string;
+  citations?: ChatCitation[];
 };
 
 type VoiceAgent = {
@@ -165,19 +168,27 @@ export function ECareAIChat() {
     setIsSubmitting(true);
 
     try {
-      const reply = await generateGeminiReply(
+      const session = await getSession();
+      const accessToken = session?.access_token;
+      if (!accessToken) {
+        throw new Error("Sign in to ask questions about care records");
+      }
+
+      const result = await generateGeminiReply(
         nextHistory.map(({ role, text }) => ({ role, text })),
+        accessToken,
       );
       setMessages((current) => [
         ...current,
         {
           id: `assistant-${Date.now()}`,
           role: "assistant",
-          text: reply,
+          text: result.reply,
+          citations: result.citations,
         },
       ]);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to reach Gemini";
+      const message = error instanceof Error ? error.message : "Unable to reach chat service";
       setChatError(message);
       setMessages((current) => [
         ...current,
@@ -185,7 +196,7 @@ export function ECareAIChat() {
           id: `assistant-error-${Date.now()}`,
           role: "assistant",
           text:
-            "I couldn't complete that request right now. Check the Gemini configuration and try again.",
+            "I couldn't complete that request right now. Check the server chat configuration and try again.",
         },
       ]);
     } finally {
@@ -352,6 +363,24 @@ export function ECareAIChat() {
                         {message.role}
                       </p>
                       <p className="text-sm leading-6">{message.text}</p>
+                      {message.role === "assistant" && message.citations?.length ? (
+                        <div className="mt-3 border-t border-[rgba(22,52,59,0.08)] pt-3">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary/60">
+                            Grounded on
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {message.citations.map((citation) => (
+                              <div
+                                key={citation.id}
+                                className="rounded-2xl border border-[rgba(22,52,59,0.1)] bg-[rgba(248,245,238,0.9)] px-3 py-2 text-xs text-[#16343b]"
+                              >
+                                <p className="font-semibold">{citation.label}</p>
+                                <p className="mt-1 text-primary/70">{citation.detail}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   ))}
                   {renderedMessages.length === 0 ? (

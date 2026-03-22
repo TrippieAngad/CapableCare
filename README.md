@@ -64,6 +64,12 @@ Create `server/.env.local` with:
 ```bash
 HOST=127.0.0.1
 PORT=8787
+GEMINI_API_KEY=your-gemini-api-key
+GEMINI_MODEL=gemini-2.5-flash
+GEMINI_EMBEDDING_MODEL=text-embedding-004
+SUPABASE_URL=your-project-url
+SUPABASE_ANON_KEY=your-publishable-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ELEVENLABS_AGENTS=Jack-english:agent_8901km9v6qmnfz4rmb2yqkqe6kwe,turkish-Deniz:agent_4501km9vd5r4e0yv2v7da4w9smej
 ELEVENLABS_DEFAULT_AGENT_ID=agent_8901km9v6qmnfz4rmb2yqkqe6kwe
 ELEVENLABS_API_KEY=your-elevenlabs-api-key
@@ -82,14 +88,41 @@ Do not add privileged credentials to the frontend:
 - database passwords
 - direct Postgres connection strings
 
+The chat flow now runs through `server/index.mjs`, which retrieves the signed-in user's permitted care data from Supabase before calling Gemini. The server can fall back to `frontend/.env` for the public Supabase URL/key, but the Gemini API key should live in `server/.env.local`.
+
+## Persistent Document RAG
+
+CapableCare now supports persistent document retrieval through Supabase-backed `document_sources` and `document_chunks` tables. The chat server retrieves those chunks with row-level security, ranks them with Gemini embeddings, and adds the best matches to the prompt.
+
+Run the schema SQL so the new document tables and policies exist, then ingest documents with:
+
+```bash
+npm run rag:ingest -- --file ./CapableCare/docs/capablecare-community-guide.md --title "CapableCare Community Guide" --scope global --source-kind guide
+```
+
+To ingest a client-specific PDF:
+
+```bash
+npm run rag:ingest -- --file /absolute/path/to/elder-plan.pdf --title "Discharge Plan" --scope client --client-id your-elderly-client-uuid --source-kind pdf
+```
+
+Notes:
+
+- The ingestion script uses `SUPABASE_SERVICE_ROLE_KEY` because it writes indexed chunks to Supabase.
+- On this machine, PDF extraction uses macOS metadata via `mdls`. If the PDF does not expose extractable text there, export it to `.txt` or `.md` and ingest that file instead.
+- The bundled `docs/capablecare-community-guide.md` remains as a local fallback if the persistent RAG tables have not been populated yet.
+
 ## Important files
 
 - App UI: [`frontend/src/App.tsx`](./frontend/src/App.tsx)
 - Supabase client: [`frontend/src/lib/supabase.ts`](./frontend/src/lib/supabase.ts)
 - Portal data layer: [`frontend/src/lib/portal.ts`](./frontend/src/lib/portal.ts)
+- App guide for retrieval: [`docs/capablecare-community-guide.md`](./docs/capablecare-community-guide.md)
+- RAG ingestion script: [`scripts/ingest-document-rag.mjs`](./scripts/ingest-document-rag.mjs)
 
 ## Notes
 
 - Row-level security is part of the product model, not an optional add-on.
 - If you change care access rules, update both SQL policies and the frontend query assumptions together.
 - The old FastAPI prototype has been removed so the repo matches the deployed architecture.
+- ECareAI now uses both structured retrieval from Supabase and vector retrieval over the CapableCare guide document for app-specific tab and product-theme questions.

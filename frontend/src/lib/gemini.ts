@@ -3,56 +3,64 @@ export interface GeminiMessage {
   text: string;
 }
 
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta";
-const DEFAULT_MODEL = import.meta.env.VITE_GEMINI_MODEL || "gemini-2.5-flash";
+import { buildVoiceApiUrl } from "./voice-api";
 
-export async function generateGeminiReply(history: GeminiMessage[]) {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("Missing VITE_GEMINI_API_KEY");
+export interface ChatCitation {
+  id: string;
+  label: string;
+  detail: string;
+}
+
+export interface ChatReply {
+  reply: string;
+  citations: ChatCitation[];
+}
+
+export async function generateGeminiReply(
+  history: GeminiMessage[],
+  accessToken: string,
+): Promise<ChatReply> {
+  if (!accessToken) {
+    throw new Error("Missing Supabase access token");
   }
 
-  const response = await fetch(
-    `${GEMINI_API_URL}/models/${DEFAULT_MODEL}:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [
-            {
-              text:
-                "You are ECareAI, a concise care-coordination assistant. " +
-                "Help with eldercare planning, visit logistics, family updates, caretaker fit, and risk summaries. " +
-                "Do not claim access to records unless the user provided them in the conversation.",
-            },
-          ],
-        },
-        contents: history.map((message) => ({
-          role: message.role === "assistant" ? "model" : "user",
-          parts: [{ text: message.text }],
-        })),
-      }),
+  const response = await fetch(buildVoiceApiUrl("/api/chat"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
     },
-  );
-
+    body: JSON.stringify({
+      accessToken,
+      messages: history,
+    }),
+  });
   const payload = await response.json();
 
   if (!response.ok) {
-    const message = payload?.error?.message || "Gemini request failed";
-    throw new Error(message);
+    throw new Error(payload?.error || "Chat request failed");
   }
 
-  const text = payload?.candidates?.[0]?.content?.parts
-    ?.map((part: { text?: string }) => part.text || "")
-    .join("")
-    .trim();
+  const text = typeof payload?.reply === "string" ? payload.reply.trim() : "";
+  const citations = Array.isArray(payload?.citations)
+    ? payload.citations
+        .filter(
+          (entry: unknown): entry is ChatCitation =>
+            Boolean(
+              entry &&
+                typeof entry === "object" &&
+                typeof (entry as ChatCitation).id === "string" &&
+                typeof (entry as ChatCitation).label === "string" &&
+                typeof (entry as ChatCitation).detail === "string",
+            ),
+        )
+    : [];
 
   if (!text) {
-    throw new Error("Gemini returned an empty response");
+    throw new Error("Chat service returned an empty response");
   }
 
-  return text;
+  return {
+    reply: text,
+    citations,
+  };
 }
